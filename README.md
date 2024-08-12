@@ -7,7 +7,7 @@ The marble source is modeled as a bool channel that emits one true value per mar
 Each peg is modeled as a bool channel with two "child" channels, that forwards
 values to either its left or right child with 50% probability.
 
-Results are collected into bins at the final row of leaf nodes.
+Results are collected into bins from the final row of leaf channels.
 
 Channel closures and WaitGroups are used to gate completion of the simulation run.
 
