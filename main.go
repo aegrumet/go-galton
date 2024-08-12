@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -20,6 +21,8 @@ func binomialDistribution(marbleCount int, binCount int) ([]int, *sync.WaitGroup
 		r = nextRow(r)
 	}
 
+	// Wait for all bins to be marked Done. Each bin completes when its feeder
+	// channel closes.
 	wg.Add(binCount)
 	return bins(&wg, r), &wg
 
@@ -42,6 +45,10 @@ func marbleSource(count int) chan bool {
 // channel in the returned slice can receive a value from the left or right
 // parent channel (except at the boundaries), and will emit a value to the
 // next row.
+//
+// Child channels close when both left and right parent channels close. The
+// boundary channels at the 0th and ith positions close when their single
+// parent closes.
 func nextRow(parents []chan bool) []chan bool {
 	children := make([]chan bool, len(parents)+1)
 	waitGroups := make([]sync.WaitGroup, len(parents)+1)
@@ -126,7 +133,11 @@ func printOutput(values []int) {
 }
 
 func main() {
-	values, wg := binomialDistribution(1000, 5)
+	marbleCount := flag.Int("marbles", 1000, "number of marbles")
+	binCount := flag.Int("bins", 5, "number of bins")
+	flag.Parse()
+
+	values, wg := binomialDistribution(*marbleCount, *binCount)
 	wg.Wait()
 	printOutput(values)
 }
