@@ -3,22 +3,29 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"time"
+	"sync"
 )
 
-func binomialDistribution(marbleCount int, bucketCount int) []int {
+// Simulates a Galton board using marbleCount marbles and binCount bins. Returns
+// a slice of integers and a wait group. The slice of integers contains the
+// number of marbles in each bin when the simulation is complete.
+func binomialDistribution(marbleCount int, binCount int) ([]int, *sync.WaitGroup) {
+
+	var wg sync.WaitGroup
 
 	g := marbleSource(marbleCount)
 	r := nextRow([]chan bool{g})
 
-	for i := 1; i < bucketCount-1; i++ {
+	for i := 1; i < binCount-1; i++ {
 		r = nextRow(r)
 	}
 
-	return bins(r)
+	wg.Add(binCount)
+	return bins(&wg, r), &wg
 
 }
 
+// Returns a bool channel that will emit count true values before closing.
 func marbleSource(count int) chan bool {
 	out := make(chan bool)
 
@@ -31,13 +38,21 @@ func marbleSource(count int) chan bool {
 	return out
 }
 
+// Given a parent slice of channels, returns the next row of channels. Each
+// channel in the returned slice can receive a value from the left or right
+// parent channel (except at the boundaries), and will emit a value to the
+// next row.
 func nextRow(parents []chan bool) []chan bool {
 	children := make([]chan bool, len(parents)+1)
+	waitGroups := make([]sync.WaitGroup, len(parents)+1)
 
 	children[0] = make(chan bool)
 
 	for i := 1; i <= len(parents); i++ {
 		children[i] = make(chan bool)
+
+		waitGroups[i-1].Add(1)
+		waitGroups[i].Add(1)
 
 		go func() {
 			for range parents[i-1] {
@@ -48,14 +63,26 @@ func nextRow(parents []chan bool) []chan bool {
 					children[i] <- true
 				}
 			}
+			waitGroups[i-1].Done()
+			waitGroups[i].Done()
 		}()
 
+		go func() {
+			waitGroups[i].Wait()
+			close(children[i])
+		}()
 	}
+
+	go func() {
+		waitGroups[0].Wait()
+		close(children[0])
+	}()
 
 	return children
 }
 
-func bins(leafNodes []chan bool) []int {
+// Count the total number of marbles in each bin. Returns a slice of integers.
+func bins(wg *sync.WaitGroup, leafNodes []chan bool) []int {
 	result := make([]int, len(leafNodes))
 
 	for i := 0; i < len(leafNodes); i++ {
@@ -63,6 +90,7 @@ func bins(leafNodes []chan bool) []int {
 			for range leafNodes[i] {
 				result[i]++
 			}
+			wg.Done()
 		}()
 	}
 	return result
@@ -98,7 +126,7 @@ func printOutput(values []int) {
 }
 
 func main() {
-	values := binomialDistribution(500, 5)
-	time.Sleep(1 * time.Second)
+	values, wg := binomialDistribution(1000, 5)
+	wg.Wait()
 	printOutput(values)
 }
