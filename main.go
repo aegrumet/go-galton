@@ -8,18 +8,18 @@ import (
 
 func binomialDistribution(marbleCount int, bucketCount int) []int {
 
-	g := marbleGenerator(marbleCount)
+	g := marbleSource(marbleCount)
 	r := nextRow([]chan bool{g})
 
 	for i := 1; i < bucketCount-1; i++ {
 		r = nextRow(r)
 	}
 
-	return buckets(r)
+	return bins(r)
 
 }
 
-func marbleGenerator(count int) chan bool {
+func marbleSource(count int) chan bool {
 	out := make(chan bool)
 
 	go func() {
@@ -55,7 +55,7 @@ func nextRow(parents []chan bool) []chan bool {
 	return children
 }
 
-func buckets(leafNodes []chan bool) []int {
+func bins(leafNodes []chan bool) []int {
 	result := make([]int, len(leafNodes))
 
 	for i := 0; i < len(leafNodes); i++ {
