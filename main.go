@@ -15,7 +15,7 @@ func binomialDistribution(marbleCount int, binCount int) ([]int, *sync.WaitGroup
 	var wg sync.WaitGroup
 
 	g := marbleSource(marbleCount)
-	r := nextRow([]chan bool{g})
+	r := nextRow([]chan struct{}{g})
 
 	for i := 1; i < binCount-1; i++ {
 		r = nextRow(r)
@@ -28,14 +28,14 @@ func binomialDistribution(marbleCount int, binCount int) ([]int, *sync.WaitGroup
 
 }
 
-// Returns a bool channel that will emit count true values before closing.
-func marbleSource(count int) chan bool {
-	out := make(chan bool)
+// Returns a channel that will emit count empty structs before closing.
+func marbleSource(count int) chan struct{} {
+	out := make(chan struct{})
 
 	go func() {
 		defer close(out)
 		for i := 0; i < count; i++ {
-			out <- true
+			out <- struct{}{}
 		}
 	}()
 	return out
@@ -49,14 +49,14 @@ func marbleSource(count int) chan bool {
 // Child channels close when both left and right parent channels close. The
 // boundary channels at the 0th and ith positions close when their single
 // parent closes.
-func nextRow(parents []chan bool) []chan bool {
-	children := make([]chan bool, len(parents)+1)
+func nextRow(parents []chan struct{}) []chan struct{} {
+	children := make([]chan struct{}, len(parents)+1)
 	waitGroups := make([]sync.WaitGroup, len(parents)+1)
 
-	children[0] = make(chan bool)
+	children[0] = make(chan struct{})
 
 	for i := 1; i <= len(parents); i++ {
-		children[i] = make(chan bool)
+		children[i] = make(chan struct{})
 
 		waitGroups[i-1].Add(1)
 		waitGroups[i].Add(1)
@@ -65,9 +65,9 @@ func nextRow(parents []chan bool) []chan bool {
 			for range parents[i-1] {
 				r := rand.Intn(2)
 				if r == 0 {
-					children[i-1] <- true
+					children[i-1] <- struct{}{}
 				} else {
-					children[i] <- true
+					children[i] <- struct{}{}
 				}
 			}
 			waitGroups[i-1].Done()
@@ -89,7 +89,7 @@ func nextRow(parents []chan bool) []chan bool {
 }
 
 // Count the total number of marbles in each bin. Returns a slice of integers.
-func bins(wg *sync.WaitGroup, leafNodes []chan bool) []int {
+func bins(wg *sync.WaitGroup, leafNodes []chan struct{}) []int {
 	result := make([]int, len(leafNodes))
 
 	for i := 0; i < len(leafNodes); i++ {
